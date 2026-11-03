@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>탄성파와 소리: 음파의 간섭</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        /* 커스텀 슬라이더 스타일 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center">
+
+    <div class="max-w-5xl w-full">
+        <!-- 헤더 및 학습목표 -->
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-slate-800 mb-2">음파의 간섭과 경로차</h1>
+            <p class="text-slate-600 bg-blue-50 inline-block px-4 py-2 rounded-full font-medium">
+                학습목표: 음파의 간섭을 이해하고, 간섭 지점에서의 경로차를 정량적으로 구할 수 있다.
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <!-- 왼쪽: 시뮬레이션 화면 (캔버스) -->
+            <div class="lg:col-span-3 flex flex-col gap-4">
+                <div class="canvas-container">
+                    <canvas id="simCanvas" width="800" height="450"></canvas>
+                </div>
+                
+                <!-- 조작부 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                        <h2 class="text-lg font-bold text-slate-800">관찰자 위치 이동</h2>
+                        <div class="flex gap-4">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="showPattern" class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500 relative"></div>
+                                <span class="ml-3 text-sm font-medium text-slate-700">간섭무늬 보기</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="showWaves" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500 relative"></div>
+                                <span class="ml-3 text-sm font-medium text-slate-700">파동 보기</span>
+                            </label>
+                        </div>
+                    </div>
+                    <input type="range" id="posSlider" min="0" max="6" value="3" step="1">
+                    <div class="flex justify-between text-xs text-slate-500 mt-2 font-medium px-2">
+                        <span>상쇄</span>
+                        <span>보강</span>
+                        <span>상쇄</span>
+                        <span class="text-blue-600 font-bold text-sm">중앙</span>
+                        <span>상쇄</span>
+                        <span>보강</span>
+                        <span>상쇄</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 수식 및 설명 패널 -->
+            <div class="lg:col-span-2 flex flex-col gap-4">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex-grow">
+                    <h2 class="text-xl font-bold text-slate-800 mb-4 border-b pb-2">경로차 정량적 계산</h2>
+                    
+                    <div class="mb-4 text-center">
+                        <span class="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-lg text-sm font-bold">
+                            음파의 파장(λ) = 2.0 m
+                        </span>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-4 mb-4">
+                        <p class="text-sm text-slate-600 mb-1">스피커 S₁에서 관찰자까지의 거리 (<span class="font-bold text-blue-700">S₁P</span>) : <span id="distL1" class="font-bold text-lg text-slate-800">5.0</span> m</p>
+                        <p class="text-sm text-slate-600 mb-1">스피커 S₂에서 관찰자까지의 거리 (<span class="font-bold text-blue-700">S₂P</span>) : <span id="distL2" class="font-bold text-lg text-slate-800">5.0</span> m</p>
+                        <hr class="my-2 border-blue-200">
+                        <p class="text-sm text-slate-700 font-medium">경로차 <span class="font-serif italic text-lg">|S₁P - S₂P|</span> = <span id="distDiff" class="font-bold text-xl text-red-600">0.0</span> m</p>
+                    </div>
+
+                    <!-- 보강 간섭 수식 박스 -->
+                    <div id="formulaConstructive" class="border-2 rounded-lg p-4 mb-3 transition-all duration-300">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-lg">보강 간섭</h3>
+                            <span class="text-xs bg-white px-2 py-1 border rounded-full">소리가 커짐</span>
+                        </div>
+                        <p class="text-center font-serif text-lg mb-2 bg-white rounded p-1">|S₁P₁ - S₂P₁| = <span class="inline-block align-middle"><span class="block border-b border-black leading-none pb-1">λ</span><span class="block leading-none pt-1">2</span></span>(2m)</p>
+                        <p id="calcConstructive" class="text-sm text-center text-slate-600 font-mono"></p>
+                    </div>
+
+                    <!-- 상쇄 간섭 수식 박스 -->
+                    <div id="formulaDestructive" class="border-2 rounded-lg p-4 transition-all duration-300">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-lg">상쇄 간섭</h3>
+                            <span class="text-xs bg-white px-2 py-1 border rounded-full">소리가 작아짐</span>
+                        </div>
+                        <p class="text-center font-serif text-lg mb-2 bg-white rounded p-1">|S₁P₂ - S₂P₂| = <span class="inline-block align-middle"><span class="block border-b border-black leading-none pb-1">λ</span><span class="block leading-none pt-1">2</span></span>(2m + 1)</p>
+                        <p id="calcDestructive" class="text-sm text-center text-slate-600 font-mono"></p>
+                    </div>
+                </div>
+
+                <!-- 퀴즈 버튼 -->
+                <button onclick="openQuiz()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 text-lg">
+                    <span>💡</span> 이제 내가 이해했는지 확인해보자!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 퀴즈 모달 -->
+    <div id="quizModal" class="fixed inset-0 bg-slate-900 bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <button onclick="closeQuiz()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-xl font-bold text-slate-800 mb-4">마무리 퀴즈</h3>
+            <p class="text-slate-600 mb-6 leading-relaxed">
+                파장(λ)이 <strong class="text-indigo-600">2.0m</strong>인 소리가 있습니다.<br>
+                두 스피커로부터 거리가 각각 <strong>7.0m</strong>, <strong>4.0m</strong> 떨어진 지점에 서 있다면, 이곳에서는 어떤 간섭이 일어날까요?
+            </p>
+            <div class="flex gap-3 mb-4">
+                <button onclick="checkAnswer('보강')" class="flex-1 bg-white border-2 border-slate-300 hover:border-indigo-500 hover:bg-indigo-50 text-slate-700 font-bold py-3 rounded-xl transition-all">보강 간섭</button>
+                <button onclick="checkAnswer('상쇄')" class="flex-1 bg-white border-2 border-slate-300 hover:border-indigo-500 hover:bg-indigo-50 text-slate-700 font-bold py-3 rounded-xl transition-all">상쇄 간섭</button>
+            </div>
+            <div id="quizFeedback" class="hidden rounded-lg p-4 mt-4 text-sm font-medium"></div>
+        </div>
+    </div>
+
+    <script>
+        // ---------------------------------------------------
+        // 1. 상태 및 물리량 설정
+        // ---------------------------------------------------
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('posSlider');
+        const checkboxWaves = document.getElementById('showWaves');
+        const checkboxPattern = document.getElementById('showPattern');
+
+        // 물리적 수치 (1m = 60px 로 스케일링)
+        const SCALE = 60; 
+        const LAMBDA = 2.0; // 파장 2m
+        
+        // 7개의 고정된 상태 정의 (좌우 대칭, 식에 딱 맞아떨어지는 수치)
+        // x_m: 중심으로부터의 x좌표 (미터)
+        // l1, l2: 스피커 1, 2로부터의 거리
+        // dl: 경로차
+        const states = [
+            { id: -3, type: '상쇄', m: 1, x_m: -2.753, l1: 3.5, l2: 6.5, dl: 3.0 },
+            { id: -2, type: '보강', m: 1, x_m: -1.732, l1: 4.2, l2: 6.2, dl: 2.0 },
+            { id: -1, type: '상쇄', m: 0, x_m: -0.841, l1: 4.5, l2: 5.5, dl: 1.0 },
+            { id:  0, type: '보강', m: 0, x_m: 0.000, l1: 5.0, l2: 5.0, dl: 0.0 }, // 중앙
+            { id:  1, type: '상쇄', m: 0, x_m: 0.841, l1: 5.5, l2: 4.5, dl: 1.0 },
+            { id:  2, type: '보강', m: 1, x_m: 1.732, l1: 6.2, l2: 4.2, dl: 2.0 },
+            { id:  3, type: '상쇄', m: 1, x_m: 2.753, l1: 6.5, l2: 3.5, dl: 3.0 }
+        ];
+
+        let currentStateIndex = parseInt(slider.value); // 초기값 3 (중앙, id: 0)
+        let currentVisualX = states[currentStateIndex].x_m * SCALE; // 애니메이션용 보간 변수
+
+        // ---------------------------------------------------
+        // 2. 캔버스 그리기 함수들
+        // ---------------------------------------------------
+        function drawSpeaker(x, y) {
+            ctx.save();
+            // 스피커 박스
+            ctx.fillStyle = '#64748b'; // 회색 박스
+            ctx.beginPath();
+            ctx.roundRect(x - 30, y - 40, 60, 80, 10);
+            ctx.fill();
+            // 외부 동심원 (검정)
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            // 내부 원
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#94a3b8';
+            ctx.fill();
+            // 점 (스피커 중심)
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPerson(x, y, isConstructive) {
+            ctx.save();
+            // 사람 (파란색 아이콘 형태)
+            ctx.fillStyle = '#2563eb';
+            // 머리
+            ctx.beginPath();
+            ctx.arc(x, y - 35, 12, 0, Math.PI * 2);
+            ctx.fill();
+            // 몸통
+            ctx.beginPath();
+            ctx.roundRect(x - 15, y - 20, 30, 40, 8);
+            ctx.fill();
+            
+            // 소리 기호 (보강일 때만 크게 표시)
+            if (isConstructive) {
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                for(let i=1; i<=3; i++) {
+                    ctx.beginPath();
+                    ctx.arc(x - 15, y - 35, 10 + i*8, Math.PI*0.7, Math.PI*1.3);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(x + 15, y - 35, 10 + i*8, -Math.PI*0.3, Math.PI*0.3);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawWave(startX, startY, endX, endY, showWave) {
+            // 1. 파란색 점선 (경로)
+            ctx.beginPath();
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.setLineDash([]); // 리셋
+
+            // 2. 빨간색 물결 (음파)
+            if(showWave) {
+                const dx = endX - startX;
+                const dy = endY - startY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const nx = -dy / dist; // 법선 벡터
+                const ny = dx / dist;
+
+                ctx.beginPath();
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 3;
+                
+                const lambda_px = LAMBDA * SCALE; // 화면상 파장 길이 (120px)
+                const amplitude = 20;
+                // 시간에 따라 파동이 이동하는 효과
+                const phaseOffset = -(Date.now() * 0.003); 
+
+                for(let i = 0; i <= dist; i+=2) {
+                    const px = startX + (dx * (i/dist));
+                    const py = startY + (dy * (i/dist));
+
+                    // 파동 방정식: sin(kx + wt). 끝점에서 위상이 정확히 일치하도록 맞춤.
+                    const phase = (2 * Math.PI * i) / lambda_px + phaseOffset;
+                    const disp = Math.sin(phase) * amplitude;
+
+                    const finalX = px + nx * disp;
+                    const finalY = py + ny * disp;
+
+                    if(i === 0) ctx.moveTo(finalX, finalY);
+                    else ctx.lineTo(finalX, finalY);
+                }
+                ctx.stroke();
+            }
+        }
+
+        function drawInterferencePattern(s1X, s2X, cy) {
+            ctx.save();
+            const lambda_px = LAMBDA * SCALE; // 120
+            const v = 0.003 * lambda_px / (2 * Math.PI);
+            
+            // 파동 함수의 sin(phase) == 1 이 되는(마루) 지점의 반경 계산 (1D 파동의 위상과 완벽히 동기화)
+            let baseR = (lambda_px / 4 + Date.now() * v) % lambda_px;
+            
+            // 골 (Trough) - 파란색 반투명 점선
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+            for (let r = baseR - lambda_px/2; r < 1000; r += lambda_px) {
+                if (r > 0) {
+                    ctx.beginPath(); ctx.arc(s1X, cy, r, 0, Math.PI); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(s2X, cy, r, 0, Math.PI); ctx.stroke();
+                }
+            }
+            
+            // 마루 (Crest) - 빨간색 반투명 실선
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.setLineDash([]);
+            for (let r = baseR; r < 1000; r += lambda_px) {
+                if (r > 0) {
+                    ctx.beginPath(); ctx.arc(s1X, cy, r, 0, Math.PI); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(s2X, cy, r, 0, Math.PI); ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const cx = canvas.width / 2; // 중앙 x: 400
+            const cy = 100; // 스피커 y위치
+            const groundY = 350; // 바닥 y위치 (관찰자가 있는 곳)
+
+            // 두 스피커 거리: 6m (360px). 즉 중앙에서 각각 좌우로 3m(180px)
+            const s1X = cx - 3 * SCALE;
+            const s2X = cx + 3 * SCALE;
+
+            const isWaveVisible = checkboxWaves.checked;
+            const isPatternVisible = checkboxPattern ? checkboxPattern.checked : false;
+
+            // 간섭무늬(물결파 파면) 그리기 (선과 스피커 뒤쪽으로 배치)
+            if (isPatternVisible) {
+                drawInterferencePattern(s1X, s2X, cy);
+            }
+
+            // 중앙 선 및 바닥 선 (사진과 동일한 스타일)
+            ctx.strokeStyle = '#1e293b'; // 검은색
+            ctx.lineWidth = 2;
+            
+            // 바닥 선
+            ctx.beginPath();
+            ctx.moveTo(50, groundY);
+            ctx.lineTo(canvas.width - 50, groundY);
+            ctx.stroke();
+
+            // 중앙 수직 실선 (점선 아님, 첫번째 사진 기준)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx, groundY);
+            ctx.stroke();
+
+            // "중앙" 텍스트
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 18px "Noto Sans KR"';
+            ctx.textAlign = 'center';
+            ctx.fillText('중앙', cx, cy - 55);
+
+            // 사람 목표 위치 계산 및 부드러운 이동(lerp)
+            const state = states[currentStateIndex];
+            const targetX = cx + (state.x_m * SCALE);
+            currentVisualX += (targetX - currentVisualX) * 0.15; // 부드럽게 따라가기
+
+            // 경로와 파동 그리기
+            drawWave(s1X, cy, currentVisualX, groundY, isWaveVisible);
+            drawWave(s2X, cy, currentVisualX, groundY, isWaveVisible);
+
+            // 스피커 그리기 (파동 위에 덮기)
+            drawSpeaker(s1X, cy);
+            drawSpeaker(s2X, cy);
+
+            // 사람 그리기
+            drawPerson(currentVisualX, groundY, state.type === '보강');
+
+            // 간섭 상태 텍스트 (사람 아래)
+            ctx.fillStyle = state.type === '보강' ? '#dc2626' : '#64748b'; // 보강은 빨간색 강조
+            ctx.font = 'bold 20px "Noto Sans KR"';
+            ctx.fillText(state.type + ' 간섭', currentVisualX, groundY + 30);
+
+            // 애니메이션 루프
+            requestAnimationFrame(render);
+        }
+
+        // ---------------------------------------------------
+        // 3. UI 및 상태 업데이트 로직
+        // ---------------------------------------------------
+        function updateUI() {
+            const state = states[currentStateIndex];
+            
+            // 거리 텍스트 업데이트
+            document.getElementById('distL1').innerText = state.l1.toFixed(1);
+            document.getElementById('distL2').innerText = state.l2.toFixed(1);
+            document.getElementById('distDiff').innerText = state.dl.toFixed(1);
+
+            const fConst = document.getElementById('formulaConstructive');
+            const fDest = document.getElementById('formulaDestructive');
+            const cConst = document.getElementById('calcConstructive');
+            const cDest = document.getElementById('calcDestructive');
+
+            // 스타일 초기화
+            fConst.className = "border-2 rounded-lg p-4 mb-3 transition-all duration-300 opacity-40 bg-slate-50 border-slate-200 grayscale";
+            fDest.className = "border-2 rounded-lg p-4 transition-all duration-300 opacity-40 bg-slate-50 border-slate-200 grayscale";
+            cConst.innerHTML = "";
+            cDest.innerHTML = "";
+
+            if (state.type === '보강') {
+                fConst.className = "border-2 rounded-lg p-4 mb-3 transition-all duration-300 bg-red-50 border-red-400 shadow-md transform scale-[1.02]";
+                cConst.innerHTML = `➔ 대입: <strong class="text-red-600">${state.dl.toFixed(1)}</strong> = (2.0 / 2) × (2 × <strong>${state.m}</strong>)<br>경로차가 반파장(1m)의 <strong>짝수(${2*state.m})배</strong>이므로 보강!`;
+            } else {
+                fDest.className = "border-2 rounded-lg p-4 transition-all duration-300 bg-blue-50 border-blue-400 shadow-md transform scale-[1.02]";
+                cDest.innerHTML = `➔ 대입: <strong class="text-blue-600">${state.dl.toFixed(1)}</strong> = (2.0 / 2) × (2 × <strong>${state.m}</strong> + 1)<br>경로차가 반파장(1m)의 <strong>홀수(${2*state.m+1})배</strong>이므로 상쇄!`;
+            }
+        }
+
+        // 이벤트 리스너
+        slider.addEventListener('input', (e) => {
+            currentStateIndex = parseInt(e.target.value);
+            updateUI();
+        });
+
+        // ---------------------------------------------------
+        // 4. 퀴즈 모달 로직
+        // ---------------------------------------------------
+        function openQuiz() {
+            document.getElementById('quizModal').classList.remove('hidden');
+            document.getElementById('quizFeedback').classList.add('hidden');
+        }
+
+        function closeQuiz() {
+            document.getElementById('quizModal').classList.add('hidden');
+        }
+
+        function checkAnswer(answer) {
+            const feedback = document.getElementById('quizFeedback');
+            feedback.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+            
+            // 정답: 상쇄 간섭 (경로차 7 - 4 = 3m. 파장이 2m이므로 반파장(1m)의 3배(홀수배) -> 상쇄 간섭)
+            if (answer === '상쇄') {
+                feedback.classList.add('bg-green-100', 'text-green-800');
+                feedback.innerHTML = '<strong>🎉 정답입니다!</strong><br>경로차 |7m - 4m| = 3m 입니다.<br>이는 식 (2/2) × (2×1 + 1) 에 완벽히 들어맞는 <strong>상쇄 간섭 (m=1)</strong> 조건입니다.';
+            } else {
+                feedback.classList.add('bg-red-100', 'text-red-800');
+                feedback.innerHTML = '<strong>🤔 아쉽네요, 다시 생각해볼까요?</strong><br>경로차는 |7m - 4m| = 3m 입니다.<br>파장이 2m일 때, 반파장(λ/2 = 1m)의 홀수배(3배) 차이가 나면 마루와 골이 만나게 됩니다.';
+            }
+        }
+
+        // 초기화 실행
+        window.onload = () => {
+            updateUI();
+            render();
+        };
+    </script>
+</body>
+</html>
